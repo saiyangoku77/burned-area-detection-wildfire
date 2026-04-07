@@ -31,7 +31,7 @@ burned_area_detection/
 
 **1. Clone the repository**
 ```bash
-git clone https://github.com/yourusername/burned-area-detection.git
+git clone https://github.com/yourusername/burned-area-detection.git](https://github.com/saiyangoku77/burned-area-detection-wildfire.git
 cd burned-area-detection
 ```
 
