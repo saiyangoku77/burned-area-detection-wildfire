@@ -9,21 +9,7 @@ satellite images using Transfer Learning (MobileNetV2) and Flask.
 
 ## 📁 Project Structure
 
-burned_area_detection/
-├── notebook.ipynb       
-├── app.py               
-├── requirements.txt      
-├── templates/
-│   └── index.html       
-├── data/
-│   ├── train/
-│   │   ├── burned/       
-│   │   └── not_burned/ 
-│   └── val/
-│       ├── burned/       
-│       └── not_burned/   
-├── model/                
-└── static/uploads/      
+<img width="697" height="457" alt="image" src="https://github.com/user-attachments/assets/4f60d2c1-a70d-4a09-9756-c1304e3efe3a" />
 
 ---
 
