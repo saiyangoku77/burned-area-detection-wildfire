@@ -18,7 +18,10 @@ burned_area_detection/
 ├── data/
 │   ├── train/
 │   │   ├── burned/       
-│   │   └── not_burned/   
+│   │   └── not_burned/ 
+|   |
+|   |
+|   |
 │   └── val/
 │       ├── burned/       
 │       └── not_burned/   
