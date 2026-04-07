@@ -10,20 +10,20 @@ satellite images using Transfer Learning (MobileNetV2) and Flask.
 ## 📁 Project Structure
 
 burned_area_detection/
-├── notebook.ipynb        # Model training (run this first)
-├── app.py                # Flask web application
-├── requirements.txt      # Python dependencies
+├── notebook.ipynb       
+├── app.py               
+├── requirements.txt      
 ├── templates/
-│   └── index.html        # Web UI
+│   └── index.html       
 ├── data/
 │   ├── train/
-│   │   ├── burned/       ← Add burned satellite images here
-│   │   └── not_burned/   ← Add not burned images here
+│   │   ├── burned/       
+│   │   └── not_burned/   
 │   └── val/
-│       ├── burned/       ← 20% of burned images
-│       └── not_burned/   ← 20% of not burned images
-├── model/                # Trained model saves here
-└── static/uploads/       # Temporary upload storage
+│       ├── burned/       
+│       └── not_burned/   
+├── model/                
+└── static/uploads/      
 
 ---
 
