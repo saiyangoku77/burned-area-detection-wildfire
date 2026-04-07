@@ -46,11 +46,8 @@ pip install -r requirements.txt
 
 Add your own satellite images to the data folders above.
 
-Recommended sources:
-- [Kaggle Wildfire Datasets](https://www.kaggle.com/search?q=wildfire+satellite)
-- [NASA FIRMS](https://firms.modaps.eosdis.nasa.gov)
-- [Sentinel Hub EO Browser](https://apps.sentinel-hub.com/eo-browser)
-
+Recommended sources: (This is what I used)
+- [Kaggle Wildfire Datasets](https://www.kaggle.com/datasets/abdelghaniaaba/wildfire-prediction-dataset) 
 Minimum recommended: **200+ images per class**
 
 Split your images: **80% into train/** and **20% into val/**
