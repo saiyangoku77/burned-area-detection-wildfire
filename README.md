@@ -19,9 +19,6 @@ burned_area_detection/
 │   ├── train/
 │   │   ├── burned/       
 │   │   └── not_burned/ 
-|   |
-|   |
-|   |
 │   └── val/
 │       ├── burned/       
 │       └── not_burned/   
