@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>🔥 Burned Area Detector</title>
+
+  <!-- Google Fonts: Syne (display) + DM Mono (data/readouts) -->
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+
+  <style>
+    /* =========================================================
+       CSS CUSTOM PROPERTIES — Global design tokens
+    ========================================================= */
+    :root {
+      --bg:            #0a0c0f;       /* Near-black background */
+      --surface:       #111418;       /* Card background */
+      --surface-2:     #181c22;       /* Elevated surface */
+      --border:        #232830;       /* Subtle border */
+      --border-bright: #2e3540;
+      --text:          #e8ecf0;       /* Primary text */
+      --text-muted:    #6b7585;       /* Secondary/muted text */
+      --accent:        #ff4c1e;       /* Flame orange-red accent */
+      --accent-dim:    rgba(255,76,30,0.12);
+      --green:         #1bde6e;       /* Safe / not burned */
+      --green-dim:     rgba(27,222,110,0.1);
+      --red:           #ff3b2e;       /* Danger / burned */
+      --red-dim:       rgba(255,59,46,0.1);
+      --mono:          'DM Mono', monospace;
+      --sans:          'Syne', sans-serif;
+      --radius:        12px;
+      --radius-lg:     20px;
+    }
+
+    /* =========================================================
+       RESET & BASE
+    ========================================================= */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      min-height: 100vh;
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      overflow-x: hidden;
+    }
+
+    /* Animated noise grain overlay for depth */
+    body::before {
+      content: '';
+      position: fixed; inset: 0; z-index: 0;
+      pointer-events: none;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+      background-size: 256px 256px;
+      opacity: 1;
+    }
+
+    /* =========================================================
+       LAYOUT
+    ========================================================= */
+    .page-wrap {
+      position: relative; z-index: 1;
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 48px 24px 80px;
+    }
+
+    /* =========================================================
+       HEADER
+    ========================================================= */
+    .header {
+      text-align: center;
+      margin-bottom: 52px;
+    }
+
+    .header-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--accent-dim);
+      border: 1px solid rgba(255,76,30,0.25);
+      border-radius: 100px;
+      padding: 5px 14px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--accent);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 24px;
+    }
+
+    .header-badge span { font-size: 16px; }
+
+    h1 {
+      font-size: clamp(2rem, 5vw, 3.2rem);
+      font-weight: 800;
+      line-height: 1.08;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      margin-bottom: 16px;
+    }
+
+    h1 em {
+      font-style: normal;
+      background: linear-gradient(135deg, #ff6b35, #ff3b2e);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .header-sub {
+      font-size: 15px;
+      color: var(--text-muted);
+      max-width: 500px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+
+    /* =========================================================
+       UPLOAD CARD
+    ========================================================= */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 32px;
+      margin-bottom: 28px;
+    }
+
+    .card-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+
+    /* Drop zone */
+    .drop-zone {
+      border: 2px dashed var(--border-bright);
+      border-radius: var(--radius);
+      padding: 48px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      background: var(--surface-2);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .drop-zone:hover,
+    .drop-zone.drag-over {
+      border-color: var(--accent);
+      background: var(--accent-dim);
+    }
+
+    .drop-zone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+
+    .drop-icon {
+      font-size: 42px;
+      margin-bottom: 12px;
+      display: block;
+    }
+
+    .drop-text-main {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+
+    .drop-text-sub {
+      font-size: 13px;
+      color: var(--text-muted);
+      font-family: var(--mono);
+    }
+
+    /* Preview of selected image */
+    #preview-container {
+      display: none;
+      margin-top: 20px;
+      border-radius: var(--radius);
+      overflow: hidden;
+      border: 1px solid var(--border-bright);
+      text-align: center;
+      background: var(--surface-2);
+      padding: 16px;
+    }
+
+    #preview-container .preview-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text-muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    #preview-img {
+      max-width: 100%;
+      max-height: 280px;
+      object-fit: contain;
+      border-radius: 8px;
+      display: block;
+      margin: 0 auto;
+    }
+
+    #file-name {
+      margin-top: 8px;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--text-muted);
+      word-break: break-all;
+    }
+
+    /* =========================================================
+       DETECT BUTTON
+    ========================================================= */
+    .btn-detect {
+      width: 100%;
+      padding: 16px;
+      background: linear-gradient(135deg, #ff4c1e, #ff2a0e);
+      border: none;
+      border-radius: var(--radius);
+      color: #fff;
+      font-family: var(--sans);
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-detect:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 28px rgba(255,76,30,0.35);
+    }
+
+    .btn-detect:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    .btn-detect:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* Shimmer loading animation on button */
+    .btn-detect.loading::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+      animation: shimmer 1.2s infinite;
+    }
+
+    @keyframes shimmer {
+      0%   { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
+
+    /* =========================================================
+       PROGRESS / STATUS BAR
+    ========================================================= */
+    #status-bar {
+      display: none;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      margin-bottom: 20px;
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--text-muted);
+      display: none;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid var(--border-bright);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* =========================================================
+       RESULT CARD
+    ========================================================= */
+    #result-card {
+      display: none;
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      border: 1px solid var(--border);
+      animation: slideUp 0.4s ease;
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Colored top accent bar */
+    .result-accent-bar {
+      height: 4px;
+      width: 100%;
+    }
+
+    .result-accent-bar.burned     { background: linear-gradient(90deg, #ff3b2e, #ff6b35); }
+    .result-accent-bar.not-burned { background: linear-gradient(90deg, #1bde6e, #00c9a7); }
+
+    .result-inner {
+      padding: 28px 32px 32px;
+    }
+
+    /* Verdict row — big status display */
+    .verdict-row {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      margin-bottom: 28px;
+    }
+
+    .verdict-icon {
+      width: 60px; height: 60px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      flex-shrink: 0;
+    }
+
+    .verdict-icon.burned     { background: var(--red-dim);   border: 1px solid rgba(255,59,46,0.3); }
+    .verdict-icon.not-burned { background: var(--green-dim); border: 1px solid rgba(27,222,110,0.3); }
+
+    .verdict-text .verdict-label {
+      font-size: 11px;
+      font-family: var(--mono);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .verdict-text .verdict-value {
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    .verdict-value.burned     { color: var(--red); }
+    .verdict-value.not-burned { color: var(--green); }
+
+    /* Stats grid — confidence + raw score */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+
+    .stat-box {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+
+    .stat-box .stat-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .stat-box .stat-value {
+      font-size: 22px;
+      font-weight: 700;
+      font-family: var(--mono);
+    }
+
+    /* Confidence bar */
+    .confidence-bar-wrap {
+      margin-bottom: 28px;
+    }
+
+    .confidence-bar-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .confidence-bar-bg {
+      height: 8px;
+      background: var(--surface-2);
+      border-radius: 100px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .confidence-bar-fill {
+      height: 100%;
+      border-radius: 100px;
+      transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .confidence-bar-fill.burned     { background: linear-gradient(90deg, #ff3b2e, #ff6b35); }
+    .confidence-bar-fill.not-burned { background: linear-gradient(90deg, #1bde6e, #00c9a7); }
+
+    /* Result image with colored border */
+    .result-image-section .section-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+
+    #result-img {
+      width: 100%;
+      border-radius: var(--radius);
+      display: block;
+      border: 1px solid var(--border);
+    }
+
+    /* =========================================================
+       ERROR MESSAGE
+    ========================================================= */
+    #error-box {
+      display: none;
+      background: rgba(255,59,46,0.08);
+      border: 1px solid rgba(255,59,46,0.25);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--red);
+      margin-bottom: 20px;
+    }
+
+    /* =========================================================
+       FOOTER INSTRUCTIONS
+    ========================================================= */
+    .how-to {
+      border-top: 1px solid var(--border);
+      margin-top: 52px;
+      padding-top: 36px;
+    }
+
+    .how-to h3 {
+      font-size: 13px;
+      font-family: var(--mono);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 20px;
+    }
+
+    .steps-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+    }
+
+    .step {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+
+    .step-num {
+      font-size: 11px;
+      font-family: var(--mono);
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+
+    .step-title { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+    .step-desc  { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+
+    /* =========================================================
+       RESPONSIVE
+    ========================================================= */
+    @media (max-width: 540px) {
+      .stats-grid { grid-template-columns: 1fr; }
+      .card { padding: 20px; }
+      .result-inner { padding: 20px; }
+    }
+  </style>
+</head>
+
+<body>
+<div class="page-wrap">
+
+  <!-- ===== HEADER ===== -->
+  <header class="header">
+    <div class="header-badge">
+      <span>🛰️</span> Satellite Image Analysis
+    </div>
+    <h1>Detect <em>Burned</em><br>Areas from Space</h1>
+    <p class="header-sub">
+      Upload a satellite image. Our ML model analyzes spectral patterns
+      to determine if the area shows wildfire burn damage.
+    </p>
+  </header>
+
+  <!-- ===== UPLOAD CARD ===== -->
+  <div class="card">
+    <div class="card-label">Upload Satellite Image</div>
+
+    <!-- Drop Zone -->
+    <div class="drop-zone" id="drop-zone">
+      <!-- Hidden file input — clicking the zone triggers this -->
+      <input type="file" id="file-input" accept=".jpg,.jpeg,.png,.tif,.tiff" />
+      <span class="drop-icon">🛰️</span>
+      <div class="drop-text-main">Drop your satellite image here</div>
+      <div class="drop-text-sub">or click to browse — JPG, PNG, TIF supported</div>
+    </div>
+
+    <!-- Image Preview (shown after selection) -->
+    <div id="preview-container">
+      <div class="preview-label">Selected Image Preview</div>
+      <img id="preview-img" src="" alt="Preview"/>
+      <div id="file-name"></div>
+    </div>
+
+    <!-- Detect Button -->
+    <button class="btn-detect" id="detect-btn" disabled>
+      <span>🔍</span>
+      <span id="btn-text">Analyze Image</span>
+    </button>
+  </div>
+
+  <!-- ===== STATUS BAR (visible during loading) ===== -->
+  <div id="status-bar">
+    <div class="spinner"></div>
+    <span id="status-text">Uploading image and running detection...</span>
+  </div>
+
+  <!-- ===== ERROR BOX ===== -->
+  <div id="error-box"></div>
+
+  <!-- ===== RESULT CARD ===== -->
+  <div id="result-card">
+    <!-- Top accent bar — red or green depending on result -->
+    <div class="result-accent-bar" id="accent-bar"></div>
+
+    <div class="result-inner">
+
+      <!-- Verdict Row -->
+      <div class="verdict-row">
+        <div class="verdict-icon" id="verdict-icon"></div>
+        <div class="verdict-text">
+          <div class="verdict-label">Detection Result</div>
+          <div class="verdict-value" id="verdict-value">—</div>
+        </div>
+      </div>
+
+      <!-- Stats: Confidence + Raw Score -->
+      <div class="stats-grid">
+        <div class="stat-box">
+          <div class="stat-label">Confidence</div>
+          <div class="stat-value" id="stat-confidence">—</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Model Score (0–1)</div>
+          <div class="stat-value" id="stat-raw">—</div>
+        </div>
+      </div>
+
+      <!-- Confidence Bar -->
+      <div class="confidence-bar-wrap">
+        <div class="confidence-bar-label">Confidence Level</div>
+        <div class="confidence-bar-bg">
+          <div class="confidence-bar-fill" id="confidence-fill" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <!-- Result Image with Colored Border Highlight -->
+      <div class="result-image-section">
+        <div class="section-label">
+          Analyzed Image —
+          <span id="border-color-label"></span> border indicates detection
+        </div>
+        <img id="result-img" src="" alt="Analysis Result"/>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== INSTRUCTIONS FOOTER ===== -->
+  <div class="how-to">
+    <h3>How it works</h3>
+    <div class="steps-grid">
+      <div class="step">
+        <div class="step-num">STEP 01</div>
+        <div class="step-title">Upload Image</div>
+        <div class="step-desc">Provide a satellite image in JPG, PNG, or GeoTIFF format.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">STEP 02</div>
+        <div class="step-title">AI Analysis</div>
+        <div class="step-desc">MobileNetV2 model extracts spectral burn signatures from the image.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">STEP 03</div>
+        <div class="step-title">Detection</div>
+        <div class="step-desc">Result shown with confidence score and visual border highlight.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">RESULT</div>
+        <div class="step-title">Border Color</div>
+        <div class="step-desc">🔴 Red = burned area detected. 🟢 Green = no burn damage found.</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- .page-wrap -->
+
+<!-- =====================================================
+     JAVASCRIPT — Handles upload, fetch, result display
+===================================================== -->
+<script>
+  // -------------------------------------------------------
+  // DOM References
+  // -------------------------------------------------------
+  const fileInput      = document.getElementById('file-input');
+  const dropZone       = document.getElementById('drop-zone');
+  const previewContainer = document.getElementById('preview-container');
+  const previewImg     = document.getElementById('preview-img');
+  const fileNameEl     = document.getElementById('file-name');
+  const detectBtn      = document.getElementById('detect-btn');
+  const btnText        = document.getElementById('btn-text');
+  const statusBar      = document.getElementById('status-bar');
+  const statusText     = document.getElementById('status-text');
+  const errorBox       = document.getElementById('error-box');
+  const resultCard     = document.getElementById('result-card');
+  const accentBar      = document.getElementById('accent-bar');
+  const verdictIcon    = document.getElementById('verdict-icon');
+  const verdictValue   = document.getElementById('verdict-value');
+  const statConfidence = document.getElementById('stat-confidence');
+  const statRaw        = document.getElementById('stat-raw');
+  const confidenceFill = document.getElementById('confidence-fill');
+  const borderColorLabel = document.getElementById('border-color-label');
+  const resultImg      = document.getElementById('result-img');
+
+  let selectedFile = null;   // Currently selected file
+
+  // -------------------------------------------------------
+  // FILE SELECTION: via input click
+  // -------------------------------------------------------
+  fileInput.addEventListener('change', function () {
+    if (this.files && this.files[0]) {
+      handleFileSelected(this.files[0]);
+    }
+  });
+
+  // -------------------------------------------------------
+  // DRAG AND DROP support
+  // -------------------------------------------------------
+  dropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropZone.classList.add('drag-over');
+  });
+
+  dropZone.addEventListener('dragleave', () => {
+    dropZone.classList.remove('drag-over');
+  });
+
+  dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) handleFileSelected(file);
+  });
+
+  // -------------------------------------------------------
+  // HANDLE FILE SELECTED
+  // Shows preview and enables Detect button
+  // -------------------------------------------------------
+  function handleFileSelected(file) {
+    selectedFile = file;
+
+    // Show image preview using FileReader
+    const reader = new FileReader();
+    reader.onload = function (e) {
+      previewImg.src = e.target.result;   // Base64 URL for preview
+      previewContainer.style.display = 'block';
+      fileNameEl.textContent = `📎 ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+    };
+    reader.readAsDataURL(file);
+
+    // Enable detect button
+    detectBtn.disabled = false;
+
+    // Hide previous results/errors when new file selected
+    resultCard.style.display = 'none';
+    errorBox.style.display   = 'none';
+  }
+
+  // -------------------------------------------------------
+  // DETECT BUTTON CLICK — Send image to Flask backend
+  // -------------------------------------------------------
+  detectBtn.addEventListener('click', async function () {
+    if (!selectedFile) return;
+
+    // --- UI: Switch to loading state ---
+    setLoadingState(true);
+    hideError();
+    resultCard.style.display = 'none';
+
+    // Build form data to send to /predict
+    const formData = new FormData();
+    formData.append('image', selectedFile);   // Key must be 'image' (matches Flask route)
+
+    try {
+      // POST request to Flask /predict endpoint
+      const response = await fetch('/predict', {
+        method : 'POST',
+        body   : formData
+        // Do NOT set Content-Type manually — browser sets it with boundary for multipart
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        displayResult(data);    // Show result card
+      } else {
+        showError(data.error || 'Unknown error occurred.');
+      }
+    } catch (err) {
+      // Network error or Flask server not running
+      showError(
+        'Could not reach the detection server. ' +
+        'Make sure app.py is running on port 5000.\n\nDetails: ' + err.message
+      );
+    } finally {
+      setLoadingState(false);   // Reset button regardless of success/failure
+    }
+  });
+
+  // -------------------------------------------------------
+  // DISPLAY RESULT
+  // -------------------------------------------------------
+  function displayResult(data) {
+    const isBurned   = (data.label === 'BURNED');
+    const colorClass = isBurned ? 'burned' : 'not-burned';
+    const icon       = isBurned ? '🔥' : '🌿';
+    const colorLabel = isBurned ? 'Red' : 'Green';
+
+    // Accent bar color
+    accentBar.className = `result-accent-bar ${colorClass}`;
+
+    // Icon circle
+    verdictIcon.className = `verdict-icon ${colorClass}`;
+    verdictIcon.textContent = icon;
+
+    // Verdict text
+    verdictValue.className = `verdict-value ${colorClass}`;
+    verdictValue.textContent = data.label;
+
+    // Stats
+    statConfidence.textContent  = `${data.confidence}%`;
+    statConfidence.style.color  = isBurned ? 'var(--red)' : 'var(--green)';
+    statRaw.textContent         = data.raw_score.toFixed(4);
+
+    // Confidence bar: animate from 0 to actual value
+    confidenceFill.className = `confidence-bar-fill ${colorClass}`;
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        confidenceFill.style.width = `${data.confidence}%`;
+      }, 50);   // Small delay so CSS transition fires
+    });
+
+    // Border color label text
+    borderColorLabel.textContent = colorLabel;
+
+    // Result image (base64 from Flask — has colored border drawn by OpenCV)
+    resultImg.src = data.image_b64;
+    resultImg.alt = `${data.label} — ${data.confidence}% confidence`;
+
+    // Show result card with animation
+    resultCard.style.display = 'block';
+
+    // Smooth scroll to result
+    setTimeout(() => {
+      resultCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  }
+
+  // -------------------------------------------------------
+  // LOADING STATE — disable button and show spinner
+  // -------------------------------------------------------
+  function setLoadingState(isLoading) {
+    detectBtn.disabled = isLoading;
+    detectBtn.classList.toggle('loading', isLoading);
+    btnText.textContent = isLoading ? 'Analyzing...' : 'Analyze Image';
+
+    // Show/hide status bar
+    statusBar.style.display = isLoading ? 'flex' : 'none';
+    statusText.textContent  = 'Running ML detection model...';
+  }
+
+  // -------------------------------------------------------
+  // ERROR DISPLAY
+  // -------------------------------------------------------
+  function showError(message) {
+    errorBox.textContent = '⚠️  ' + message;
+    errorBox.style.display = 'block';
+  }
+
+  function hideError() {
+    errorBox.style.display = 'none';
+  }
+</script>
+
+</body>
+</html>

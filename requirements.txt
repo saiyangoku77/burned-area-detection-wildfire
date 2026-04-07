@@ -1,0 +1,14 @@
+# =============================================
+# Burned Area Detection — Python Requirements
+# =============================================
+# Install all dependencies with:
+#   pip install -r requirements.txt
+
+tensorflow>=2.10.0       # Core ML framework (MobileNetV2, Keras)
+numpy>=1.23.0            # Numerical operations
+matplotlib>=3.6.0        # Training plots and charts
+scikit-learn>=1.1.0      # Confusion matrix, classification report
+seaborn>=0.12.0          # Heatmap for confusion matrix
+pillow>=9.3.0            # Image loading and processing (PIL)
+opencv-python>=4.6.0     # Drawing borders on result images
+flask>=2.2.0             # Web application framework

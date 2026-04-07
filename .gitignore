@@ -1,0 +1,8 @@
+model/*.h5
+data/train/burned/*
+data/train/not_burned/*
+data/val/burned/*
+data/val/not_burned/*
+static/uploads/*
+__pycache__/
+*.pyc
